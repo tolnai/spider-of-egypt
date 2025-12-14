@@ -1,75 +1,61 @@
-# React + TypeScript + Vite
+# Spider of Egypt Solitaire
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern web implementation of the **Thieves of Egypt** solitaire variant, built during a practice "vibe coding" session.
 
-Currently, two official plugins are available:
+**Play it here:** [https://tolnai.github.io/spider-of-egypt/](https://tolnai.github.io/spider-of-egypt/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🎮 Game Rules
 
-## React Compiler
+This game is a variant of the popular Thieves of Egypt solitaire, played with **2 decks** of cards (104 cards total).
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+### Objective
 
-Note: This will impact Vite dev & build performances.
+Build all 8 foundation piles up from **Ace to King** by suit.
 
-## Expanding the ESLint configuration
+### The Board
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Tableau**: 9 columns arranged in a pyramid shape.
+- **Foundations**: 8 piles at the top right.
+- **Stock**: Remaining cards in the deck.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### How to Play
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. **Moving Cards**: You can move cards between tableau columns if they are in **descending order** and **alternating colors** (e.g., a Red 9 on a Black 10).
+2. **Moving Sequences**: You can move entire valid sequences of cards (e.g., Red 9, Black 8, Red 7) as a single unit.
+3. **Empty Columns**: Only a **King** (or a sequence starting with a King) can be placed in an empty column.
+4. **The Stock**: Clicking the stock pile deals **one card to each tableau column**, provided the column is not already "complete" (a full King-to-Ace sequence).
+5. **Winning**: The game is won when all cards are moved to the foundation piles.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🛠️ Tech Stack
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+This project was created to practice modern frontend development techniques using:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **React 19**: For the UI component architecture.
+- **TypeScript**: For type safety and robust game logic.
+- **Vite**: For lightning-fast development and building.
+- **HTML5 Drag & Drop API**: Implemented with a custom drag layer for smooth, ghost-free card movement.
+- **GitHub Pages**: For static hosting.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🚀 Development
+
+This project was built in a "vibe coding" session, focusing on flow, aesthetics, and rapid iteration.
+
+### Running Locally
+
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+### Deployment
+
+The project is configured for easy deployment to GitHub Pages:
+
+```bash
+npm run deploy
 ```
