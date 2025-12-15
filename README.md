@@ -1,6 +1,6 @@
 # Spider of Egypt Solitaire
 
-A modern web implementation of the **Thieves of Egypt** solitaire variant, built during a practice "vibe coding" session.
+A modern web implementation of a variant of the **Thieves of Egypt** solitaire game, built during a practice "vibe coding" session.
 
 **Play it here:** [https://tolnai.github.io/spider-of-egypt/](https://tolnai.github.io/spider-of-egypt/)
 
