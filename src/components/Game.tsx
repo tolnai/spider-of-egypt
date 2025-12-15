@@ -7,9 +7,14 @@ import { isDescendingSequence } from '../utils/gameLogic';
 interface GameProps {
   onRestart: () => void;
   onExit: () => void;
+  initialMode?: 'new' | 'continue';
 }
 
-const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
+const Game: React.FC<GameProps> = ({
+  onRestart,
+  onExit,
+  initialMode = 'new',
+}) => {
   const {
     gameState,
     moveCard,
@@ -17,7 +22,9 @@ const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
     initializeGame,
     autoMoveToFoundation,
     isDealing,
-  } = useSolitaire();
+    undo,
+    canUndo,
+  } = useSolitaire(initialMode);
   const [draggingSource, setDraggingSource] = React.useState<{
     type: 'column' | 'foundation';
     index: number;
@@ -72,6 +79,8 @@ const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
         return;
       }
 
+      setDraggingSource(source);
+    } else if (source.type === 'foundation') {
       setDraggingSource(source);
     }
   };
@@ -233,6 +242,7 @@ const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
               key={`foundation-${index}`}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, { type: 'foundation', index })}
+              onDragEnd={handleDragEnd}
               style={{
                 border: '2px solid #ccc',
                 borderRadius: '6px',
@@ -247,7 +257,11 @@ const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
               {foundation.length > 0 ? (
                 <CardComponent
                   card={foundation[foundation.length - 1]}
-                  draggable={false}
+                  draggable={true}
+                  onDragStart={(e) =>
+                    handleDragStart(e, { type: 'foundation', index })
+                  }
+                  onDrag={handleDrag}
                 />
               ) : (
                 <div style={{ opacity: 0.3, fontSize: '24px' }}>A</div>
@@ -322,6 +336,9 @@ const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
             >
               Új játék
             </button>
+            <button onClick={undo} disabled={!canUndo}>
+              Visszavonás
+            </button>
             <button onClick={onExit}>Kilépés</button>
             <div style={{ fontSize: '18px', marginTop: '10px' }}>
               Lépések: {gameState.moves}
@@ -359,6 +376,25 @@ const Game: React.FC<GameProps> = ({ onRestart, onExit }) => {
                   <CardComponent card={card} draggable={false} />
                 </div>
               ))}
+          {draggingSource.type === 'foundation' &&
+            gameState.foundations[draggingSource.index].length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                }}
+              >
+                <CardComponent
+                  card={
+                    gameState.foundations[draggingSource.index][
+                      gameState.foundations[draggingSource.index].length - 1
+                    ]
+                  }
+                  draggable={false}
+                />
+              </div>
+            )}
         </div>
       )}
     </div>

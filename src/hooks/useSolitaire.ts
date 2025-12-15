@@ -7,10 +7,28 @@ import {
   isColumnComplete,
 } from '../utils/gameLogic';
 
-export const useSolitaire = () => {
+export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [history, setHistory] = useState<GameState[]>([]);
   const [isDealing, setIsDealing] = useState(false);
   const dealingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushHistory = useCallback((state: GameState) => {
+    setHistory((prev) => {
+      const newHistory = [...prev, state];
+      if (newHistory.length > 5) {
+        return newHistory.slice(newHistory.length - 5);
+      }
+      return newHistory;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    if (history.length === 0 || isDealing) return;
+    const previousState = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, -1));
+    setGameState(previousState);
+  }, [history, isDealing]);
 
   const initializeGame = useCallback(() => {
     // Clear any existing dealing timeout
@@ -20,6 +38,9 @@ export const useSolitaire = () => {
     }
 
     setIsDealing(true);
+    setHistory([]); // Clear history on restart
+    localStorage.removeItem('spider_egypt_state');
+    localStorage.removeItem('spider_egypt_history');
     const deck = shuffleDeck(generateDeck());
 
     // Initialize empty state
@@ -94,14 +115,44 @@ export const useSolitaire = () => {
     dealNextCard();
   }, []);
 
+  // Load state from local storage on mount
   useEffect(() => {
-    initializeGame();
+    if (initialMode === 'continue') {
+      const savedState = localStorage.getItem('spider_egypt_state');
+      const savedHistory = localStorage.getItem('spider_egypt_history');
+
+      if (savedState) {
+        try {
+          const parsedState = JSON.parse(savedState);
+          const parsedHistory = savedHistory ? JSON.parse(savedHistory) : [];
+          setGameState(parsedState);
+          setHistory(parsedHistory);
+          setIsDealing(false);
+        } catch (error) {
+          console.error('Failed to load saved state:', error);
+          initializeGame();
+        }
+      } else {
+        initializeGame();
+      }
+    } else {
+      initializeGame();
+    }
+
     return () => {
       if (dealingTimeoutRef.current) {
         clearTimeout(dealingTimeoutRef.current);
       }
     };
-  }, [initializeGame]);
+  }, [initializeGame, initialMode]);
+
+  // Save state to local storage whenever it changes
+  useEffect(() => {
+    if (!isDealing && gameState) {
+      localStorage.setItem('spider_egypt_state', JSON.stringify(gameState));
+      localStorage.setItem('spider_egypt_history', JSON.stringify(history));
+    }
+  }, [gameState, history, isDealing]);
 
   const moveCard = useCallback(
     (
@@ -112,86 +163,88 @@ export const useSolitaire = () => {
       },
       target: { type: 'column' | 'foundation'; index: number }
     ) => {
-      setGameState((prevState) => {
-        if (!prevState) return null;
-        const newState = { ...prevState };
+      if (!gameState) return;
 
-        // Deep copy needed for arrays we modify
-        newState.columns = newState.columns.map((col) => [...col]);
-        newState.foundations = newState.foundations.map((found) => [...found]);
+      const newState = { ...gameState };
+      newState.columns = newState.columns.map((col) => [...col]);
+      newState.foundations = newState.foundations.map((found) => [...found]);
 
-        let cardsToMove: Card[] = [];
+      let cardsToMove: Card[] = [];
+      let validMove = false;
 
-        // Get cards from source
-        if (source.type === 'column') {
-          const sourceCol = newState.columns[source.index];
-          if (!source.cardIndex && source.cardIndex !== 0) return prevState; // Should have index
-          cardsToMove = sourceCol.slice(source.cardIndex);
-        } else {
-          // Moving from foundation (if allowed, usually 1 card)
-          // Not implemented based on rules, but good for completeness if needed
-          return prevState;
-        }
+      // Get cards from source
+      if (source.type === 'column') {
+        const sourceCol = newState.columns[source.index];
+        if (!source.cardIndex && source.cardIndex !== 0) return;
+        cardsToMove = sourceCol.slice(source.cardIndex);
+      } else if (source.type === 'foundation') {
+        const sourceFoundation = newState.foundations[source.index];
+        if (sourceFoundation.length === 0) return;
+        cardsToMove = [sourceFoundation[sourceFoundation.length - 1]];
+      } else {
+        return;
+      }
 
-        // Validate and Move to Target
-        if (target.type === 'column') {
-          const targetCol = newState.columns[target.index];
-          if (canMoveToColumn(cardsToMove, targetCol)) {
-            // Remove from source
-            if (source.type === 'column') {
-              newState.columns[source.index].splice(
-                source.cardIndex!,
-                cardsToMove.length
-              );
+      // Validate and Move to Target
+      if (target.type === 'column') {
+        const targetCol = newState.columns[target.index];
+        if (canMoveToColumn(cardsToMove, targetCol)) {
+          // Remove from source
+          if (source.type === 'column') {
+            newState.columns[source.index].splice(
+              source.cardIndex!,
+              cardsToMove.length
+            );
 
-              // Reveal new top card of source column if any
-              const sourceCol = newState.columns[source.index];
-              if (sourceCol.length > 0) {
-                const newTop = sourceCol[sourceCol.length - 1];
-                if (!newTop.faceUp) {
-                  newTop.faceUp = true; // Mutating the copy
-                  // Actually we need to make sure we updated the object in the array
-                  sourceCol[sourceCol.length - 1] = { ...newTop, faceUp: true };
-                }
+            // Reveal new top card of source column if any
+            const sourceCol = newState.columns[source.index];
+            if (sourceCol.length > 0) {
+              const newTop = sourceCol[sourceCol.length - 1];
+              if (!newTop.faceUp) {
+                sourceCol[sourceCol.length - 1] = { ...newTop, faceUp: true };
               }
             }
-
-            // Add to target
-            newState.columns[target.index].push(...cardsToMove);
-            newState.moves += 1;
-            return newState;
+          } else if (source.type === 'foundation') {
+            newState.foundations[source.index].pop();
           }
-        } else if (target.type === 'foundation') {
-          // Can only move one card at a time to foundation usually
-          if (cardsToMove.length !== 1) return prevState;
 
-          const targetFoundation = newState.foundations[target.index];
-          if (canMoveToFoundation(cardsToMove[0], targetFoundation)) {
-            // Remove from source
-            if (source.type === 'column') {
-              newState.columns[source.index].splice(source.cardIndex!, 1);
+          // Add to target
+          newState.columns[target.index].push(...cardsToMove);
+          newState.moves += 1;
+          validMove = true;
+        }
+      } else if (target.type === 'foundation') {
+        if (cardsToMove.length !== 1) return;
 
-              // Reveal new top card of source column
-              const sourceCol = newState.columns[source.index];
-              if (sourceCol.length > 0) {
-                const newTop = sourceCol[sourceCol.length - 1];
-                if (!newTop.faceUp) {
-                  sourceCol[sourceCol.length - 1] = { ...newTop, faceUp: true };
-                }
+        const targetFoundation = newState.foundations[target.index];
+        if (canMoveToFoundation(cardsToMove[0], targetFoundation)) {
+          // Remove from source
+          if (source.type === 'column') {
+            newState.columns[source.index].splice(source.cardIndex!, 1);
+
+            // Reveal new top card of source column
+            const sourceCol = newState.columns[source.index];
+            if (sourceCol.length > 0) {
+              const newTop = sourceCol[sourceCol.length - 1];
+              if (!newTop.faceUp) {
+                sourceCol[sourceCol.length - 1] = { ...newTop, faceUp: true };
               }
             }
-
-            // Add to target
-            newState.foundations[target.index].push(cardsToMove[0]);
-            newState.moves += 1;
-            return newState;
           }
-        }
 
-        return prevState;
-      });
+          // Add to target
+          newState.foundations[target.index].push(cardsToMove[0]);
+          newState.moves += 1;
+          validMove = true;
+        }
+      }
+
+      if (validMove) {
+        pushHistory(gameState);
+        setGameState(newState);
+      }
     },
-    []
+    [gameState, pushHistory]
   );
 
   const drawCards = useCallback(() => {
@@ -206,6 +259,7 @@ export const useSolitaire = () => {
 
     if (eligibleColumnIndices.length === 0) return;
 
+    pushHistory(gameState);
     setIsDealing(true);
 
     let targetIndex = 0;
@@ -242,52 +296,47 @@ export const useSolitaire = () => {
     };
 
     animateDraw();
-  }, [gameState, isDealing]);
+  }, [gameState, isDealing, pushHistory]);
 
   const autoMoveToFoundation = useCallback(
     (
       card: Card,
       source: { type: 'column'; index: number; cardIndex: number }
     ) => {
-      setGameState((prevState) => {
-        if (!prevState) return null;
+      if (!gameState) return;
 
-        // Check all foundations
-        for (let i = 0; i < prevState.foundations.length; i++) {
-          if (canMoveToFoundation(card, prevState.foundations[i])) {
-            // Found a valid move, reuse moveCard logic by calling it?
-            // We can't call moveCard inside setState callback easily if moveCard also sets state.
-            // So we duplicate logic or structure differently.
-            // Duplicating logic for now as it's simple enough.
+      // Check all foundations
+      for (let i = 0; i < gameState.foundations.length; i++) {
+        if (canMoveToFoundation(card, gameState.foundations[i])) {
+          const newState = { ...gameState };
+          newState.columns = newState.columns.map((col) => [...col]);
+          newState.foundations = newState.foundations.map((found) => [
+            ...found,
+          ]);
 
-            const newState = { ...prevState };
-            newState.columns = newState.columns.map((col) => [...col]);
-            newState.foundations = newState.foundations.map((found) => [
-              ...found,
-            ]);
+          // Remove from source
+          newState.columns[source.index].splice(source.cardIndex, 1);
 
-            // Remove from source
-            newState.columns[source.index].splice(source.cardIndex, 1);
-
-            // Reveal new top
-            const sourceCol = newState.columns[source.index];
-            if (sourceCol.length > 0) {
-              const newTop = sourceCol[sourceCol.length - 1];
-              if (!newTop.faceUp) {
-                sourceCol[sourceCol.length - 1] = { ...newTop, faceUp: true };
-              }
+          // Reveal new top
+          const sourceCol = newState.columns[source.index];
+          if (sourceCol.length > 0) {
+            const newTop = sourceCol[sourceCol.length - 1];
+            if (!newTop.faceUp) {
+              sourceCol[sourceCol.length - 1] = { ...newTop, faceUp: true };
             }
-
-            // Add to foundation
-            newState.foundations[i].push(card);
-            newState.moves += 1;
-            return newState;
           }
+
+          // Add to foundation
+          newState.foundations[i].push(card);
+          newState.moves += 1;
+
+          pushHistory(gameState);
+          setGameState(newState);
+          return;
         }
-        return prevState;
-      });
+      }
     },
-    []
+    [gameState, pushHistory]
   );
 
   return {
@@ -297,5 +346,7 @@ export const useSolitaire = () => {
     drawCards,
     autoMoveToFoundation,
     isDealing,
+    undo,
+    canUndo: history.length > 0 && !isDealing,
   };
 };
