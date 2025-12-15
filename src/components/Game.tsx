@@ -143,9 +143,10 @@ const Game: React.FC<GameProps> = ({
         style={{
           flexGrow: 1,
           display: 'flex',
-          gap: '20px',
+          gap: '12px',
           overflowX: 'auto',
-          minWidth: '0',
+          minWidth: '900px',
+          justifyContent: 'center',
         }}
       >
         {gameState.columns.map((column, colIndex) => (
@@ -155,17 +156,17 @@ const Game: React.FC<GameProps> = ({
             onDrop={(e) => handleDrop(e, { type: 'column', index: colIndex })}
             onDragEnd={handleDragEnd}
             style={{
-              minWidth: '70px',
+              minWidth: '84px',
               position: 'relative',
               height: '100%',
-              flex: '0 0 70px',
+              flex: '0 0 84px',
             }}
           >
             {column.length === 0 && (
               <div
                 style={{
-                  width: '70px',
-                  height: '100px',
+                  width: '84px',
+                  height: '120px',
                   border: '2px dashed rgba(255,255,255,0.3)',
                   borderRadius: '6px',
                   margin: '0 auto',
@@ -180,12 +181,14 @@ const Game: React.FC<GameProps> = ({
                 draggingSource.cardIndex !== undefined &&
                 cardIndex >= draggingSource.cardIndex;
 
+              const isMovable = isDescendingSequence(column.slice(cardIndex));
+
               return (
                 <div
                   key={card.id}
                   style={{
                     position: 'absolute',
-                    top: `${cardIndex * 37}px`,
+                    top: `${cardIndex * 45}px`,
                     left: '0',
                     zIndex: cardIndex,
                     opacity: isHidden ? 0 : 1,
@@ -194,6 +197,7 @@ const Game: React.FC<GameProps> = ({
                   <CardComponent
                     card={card}
                     draggable={card.faceUp}
+                    isMovable={isMovable}
                     onDragStart={(e) =>
                       handleDragStart(e, {
                         type: 'column',
@@ -221,10 +225,10 @@ const Game: React.FC<GameProps> = ({
       <div
         className="sidebar"
         style={{
-          width: '340px',
+          width: '380px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '40px',
+          gap: '48px',
           flexShrink: 0,
         }}
       >
@@ -234,7 +238,7 @@ const Game: React.FC<GameProps> = ({
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '10px',
+            gap: '12px',
           }}
         >
           {gameState.foundations.map((foundation, index) => (
@@ -246,8 +250,8 @@ const Game: React.FC<GameProps> = ({
               style={{
                 border: '2px solid #ccc',
                 borderRadius: '6px',
-                width: '70px',
-                height: '100px',
+                width: '84px',
+                height: '120px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -264,7 +268,7 @@ const Game: React.FC<GameProps> = ({
                   onDrag={handleDrag}
                 />
               ) : (
-                <div style={{ opacity: 0.3, fontSize: '24px' }}>A</div>
+                <div style={{ opacity: 0.3, fontSize: '29px' }}>A</div>
               )}
             </div>
           ))}
@@ -273,7 +277,7 @@ const Game: React.FC<GameProps> = ({
         {/* Controls Area: Deck + Buttons */}
         <div
           className="controls-area"
-          style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}
+          style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}
         >
           {/* Stock */}
           <div
@@ -282,8 +286,8 @@ const Game: React.FC<GameProps> = ({
             style={{
               border: '2px dashed #ccc',
               borderRadius: '6px',
-              width: '70px',
-              height: '100px',
+              width: '84px',
+              height: '120px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -294,8 +298,8 @@ const Game: React.FC<GameProps> = ({
             {gameState.stock.length > 0 ? (
               <div
                 style={{
-                  width: '60px',
-                  height: '90px',
+                  width: '72px',
+                  height: '108px',
                   background:
                     'repeating-linear-gradient(45deg, #606dbc, #606dbc 10px, #465298 10px, #465298 20px)',
                   borderRadius: '5px',
@@ -308,8 +312,8 @@ const Game: React.FC<GameProps> = ({
             <div
               style={{
                 position: 'absolute',
-                bottom: '-25px',
-                fontSize: '14px',
+                bottom: '-30px',
+                fontSize: '17px',
                 width: '100%',
                 textAlign: 'center',
               }}
@@ -324,7 +328,7 @@ const Game: React.FC<GameProps> = ({
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
+              gap: '12px',
               flexGrow: 1,
             }}
           >
@@ -340,7 +344,7 @@ const Game: React.FC<GameProps> = ({
               Visszavonás
             </button>
             <button onClick={onExit}>Kilépés</button>
-            <div style={{ fontSize: '18px', marginTop: '10px' }}>
+            <div style={{ fontSize: '22px', marginTop: '12px' }}>
               Lépések: {gameState.moves}
             </div>
           </div>
@@ -369,7 +373,7 @@ const Game: React.FC<GameProps> = ({
                   key={card.id}
                   style={{
                     position: 'absolute',
-                    top: `${i * 30}px`,
+                    top: `${i * 36}px`,
                     left: 0,
                   }}
                 >

@@ -9,6 +9,7 @@ interface CardProps {
   onDrag?: (e: React.DragEvent) => void;
   style?: React.CSSProperties;
   draggable?: boolean;
+  isMovable?: boolean;
 }
 
 const Card: React.FC<CardProps> = ({
@@ -19,6 +20,7 @@ const Card: React.FC<CardProps> = ({
   onDrag,
   style,
   draggable,
+  isMovable = true,
 }) => {
   const getSuitSymbol = (suit: string) => {
     switch (suit) {
@@ -36,6 +38,7 @@ const Card: React.FC<CardProps> = ({
   };
 
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+  const shouldGrayOut = card.faceUp && !isMovable;
 
   return (
     <div
@@ -48,11 +51,12 @@ const Card: React.FC<CardProps> = ({
       style={{
         ...style,
         color: isRed ? 'red' : 'black',
+        filter: shouldGrayOut ? 'brightness(0.85) grayscale(0.2)' : 'none',
         backgroundColor: 'white',
         border: '1px solid #999',
         borderRadius: '6px',
-        width: '70px',
-        height: '100px',
+        width: '84px',
+        height: '120px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -68,29 +72,29 @@ const Card: React.FC<CardProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '4px',
-              left: '4px',
+              top: '5px',
+              left: '5px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               lineHeight: '1',
             }}
           >
-            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+            <div style={{ fontSize: '22px', fontWeight: 'bold' }}>
               {card.rank}
             </div>
-            <div style={{ fontSize: '14px' }}>{getSuitSymbol(card.suit)}</div>
+            <div style={{ fontSize: '17px' }}>{getSuitSymbol(card.suit)}</div>
           </div>
 
           {/* Center Symbol */}
-          <div style={{ fontSize: '34px' }}>{getSuitSymbol(card.suit)}</div>
+          <div style={{ fontSize: '41px' }}>{getSuitSymbol(card.suit)}</div>
 
           {/* Bottom Right Corner (Rotated) */}
           <div
             style={{
               position: 'absolute',
-              bottom: '4px',
-              right: '4px',
+              bottom: '5px',
+              right: '5px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -98,10 +102,10 @@ const Card: React.FC<CardProps> = ({
               transform: 'rotate(180deg)',
             }}
           >
-            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+            <div style={{ fontSize: '22px', fontWeight: 'bold' }}>
               {card.rank}
             </div>
-            <div style={{ fontSize: '14px' }}>{getSuitSymbol(card.suit)}</div>
+            <div style={{ fontSize: '17px' }}>{getSuitSymbol(card.suit)}</div>
           </div>
         </>
       ) : (
