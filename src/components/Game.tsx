@@ -49,7 +49,7 @@ const Game: React.FC<GameProps> = ({
   if (!gameState) return <div>Loading...</div>;
 
   const handleCardClick = (
-    card: CardType,
+    _card: CardType,
     source: { type: 'column' | 'foundation'; index: number; cardIndex?: number }
   ) => {
     if (isDealing) return;
@@ -179,7 +179,7 @@ const Game: React.FC<GameProps> = ({
     }
   };
 
-  const handleFoundationAreaClick = (foundationIndex: number) => {
+  const handleFoundationAreaClick = () => {
     if (isDealing) return;
     if (selectedSource) {
       // Same logic as clicking a foundation card
@@ -411,7 +411,7 @@ const Game: React.FC<GameProps> = ({
         {/* Foundations Grid 2x4 */}
         <div
           className="foundations-grid"
-          onClick={() => handleFoundationAreaClick(-1)}
+          onClick={handleFoundationAreaClick}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
@@ -424,7 +424,7 @@ const Game: React.FC<GameProps> = ({
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, { type: 'foundation', index })}
               onDragEnd={handleDragEnd}
-              onClick={() => handleFoundationAreaClick(index)}
+              onClick={handleFoundationAreaClick}
               style={{
                 border: '2px solid #ccc',
                 borderRadius: '6px',
