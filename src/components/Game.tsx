@@ -2,7 +2,7 @@ import React from 'react';
 import { useSolitaire } from '../hooks/useSolitaire';
 import CardComponent from './Card';
 import { type Card as CardType } from '../types';
-import { isDescendingSequence } from '../utils/gameLogic';
+import { isDescendingSequence, canMoveToColumn } from '../utils/gameLogic';
 
 interface GameProps {
   onRestart: () => void;
@@ -38,10 +38,172 @@ const Game: React.FC<GameProps> = ({
     x: number;
     y: number;
   } | null>(null);
+  const [selectedSource, setSelectedSource] = React.useState<{
+    type: 'column' | 'foundation';
+    index: number;
+    cardIndex?: number;
+  } | null>(null);
 
   // Re-initialize if needed when component mounts (handled by hook useEffect, but we might want to trigger it on restart prop change if we were passing gameId down, but here we remount Game component so it's fine)
 
   if (!gameState) return <div>Loading...</div>;
+
+  const handleCardClick = (
+    card: CardType,
+    source: { type: 'column' | 'foundation'; index: number; cardIndex?: number }
+  ) => {
+    if (isDealing) return;
+
+    // If nothing selected, try to select
+    if (!selectedSource) {
+      if (source.type === 'column' && source.cardIndex !== undefined) {
+        const column = gameState.columns[source.index];
+        const cardsToMove = column.slice(source.cardIndex);
+        if (isDescendingSequence(cardsToMove)) {
+          setSelectedSource(source);
+        }
+      } else if (source.type === 'foundation') {
+        // Can select foundation card to move back
+        setSelectedSource(source);
+      }
+      return;
+    }
+
+    // If clicking the same card -> deselect
+    if (
+      selectedSource.type === source.type &&
+      selectedSource.index === source.index &&
+      selectedSource.cardIndex === source.cardIndex
+    ) {
+      setSelectedSource(null);
+      return;
+    }
+
+    // If clicking a column card, treat it as a move target (to that column)
+    if (source.type === 'column') {
+      // Try to move selected cards to this column
+      let cardsToMove: CardType[] = [];
+      if (selectedSource.type === 'column') {
+        const sourceCol = gameState.columns[selectedSource.index];
+        if (selectedSource.cardIndex !== undefined) {
+          cardsToMove = sourceCol.slice(selectedSource.cardIndex);
+        }
+      } else if (selectedSource.type === 'foundation') {
+        const sourceFoundation = gameState.foundations[selectedSource.index];
+        if (sourceFoundation.length > 0) {
+          cardsToMove = [sourceFoundation[sourceFoundation.length - 1]];
+        }
+      }
+
+      const targetCol = gameState.columns[source.index];
+      if (canMoveToColumn(cardsToMove, targetCol)) {
+        moveCard(selectedSource, { type: 'column', index: source.index });
+        setSelectedSource(null);
+      } else {
+        // Invalid move.
+        // If the clicked card is movable, select it instead.
+        // Otherwise just deselect.
+        if (source.type === 'column' && source.cardIndex !== undefined) {
+          const column = gameState.columns[source.index];
+          const newSelectionMovable = isDescendingSequence(
+            column.slice(source.cardIndex)
+          );
+          if (newSelectionMovable) {
+            setSelectedSource(source);
+          } else {
+            setSelectedSource(null);
+          }
+        } else {
+          setSelectedSource(null);
+        }
+      }
+    } else if (source.type === 'foundation') {
+      // Clicking a foundation card (target)
+      // Try to move selected card to this foundation
+      // But user said "it should not matter which card I click... place it on any foundation"
+      // So we should trigger autoMoveToFoundation logic for the selected card
+      if (
+        selectedSource.type === 'column' &&
+        selectedSource.cardIndex !== undefined
+      ) {
+        const sourceCol = gameState.columns[selectedSource.index];
+        const card = sourceCol[selectedSource.cardIndex];
+        // We only move the top card to foundation usually, but autoMoveToFoundation handles logic
+        // Actually autoMoveToFoundation takes a card and source.
+        // It checks if that card can go to ANY foundation.
+        // But we need to make sure we are moving the LAST card of the sequence if we selected a stack?
+        // Usually you only move one card to foundation.
+        // If user selected a stack, can we move the bottom one? No, usually top one.
+        // If user selected a middle card, it's a stack. Can't move stack to foundation.
+        // So check if it's a single card (last in column)
+        if (selectedSource.cardIndex === sourceCol.length - 1) {
+          autoMoveToFoundation(card, {
+            type: 'column',
+            index: selectedSource.index,
+            cardIndex: selectedSource.cardIndex,
+          });
+          setSelectedSource(null);
+        } else {
+          setSelectedSource(null);
+        }
+      } else {
+        setSelectedSource(null);
+      }
+    }
+  };
+
+  const handleColumnClick = (colIndex: number) => {
+    if (isDealing) return;
+    if (selectedSource) {
+      // Try to move to empty column
+      let cardsToMove: CardType[] = [];
+      if (selectedSource.type === 'column') {
+        const sourceCol = gameState.columns[selectedSource.index];
+        if (selectedSource.cardIndex !== undefined) {
+          cardsToMove = sourceCol.slice(selectedSource.cardIndex);
+        }
+      } else if (selectedSource.type === 'foundation') {
+        const sourceFoundation = gameState.foundations[selectedSource.index];
+        if (sourceFoundation.length > 0) {
+          cardsToMove = [sourceFoundation[sourceFoundation.length - 1]];
+        }
+      }
+
+      const targetCol = gameState.columns[colIndex]; // Should be empty
+      if (canMoveToColumn(cardsToMove, targetCol)) {
+        moveCard(selectedSource, { type: 'column', index: colIndex });
+        setSelectedSource(null);
+      } else {
+        setSelectedSource(null);
+      }
+    }
+  };
+
+  const handleFoundationAreaClick = (foundationIndex: number) => {
+    if (isDealing) return;
+    if (selectedSource) {
+      // Same logic as clicking a foundation card
+      if (
+        selectedSource.type === 'column' &&
+        selectedSource.cardIndex !== undefined
+      ) {
+        const sourceCol = gameState.columns[selectedSource.index];
+        const card = sourceCol[selectedSource.cardIndex];
+        if (selectedSource.cardIndex === sourceCol.length - 1) {
+          autoMoveToFoundation(card, {
+            type: 'column',
+            index: selectedSource.index,
+            cardIndex: selectedSource.cardIndex,
+          });
+          setSelectedSource(null);
+        } else {
+          setSelectedSource(null);
+        }
+      } else {
+        setSelectedSource(null);
+      }
+    }
+  };
 
   const handleDragStart = (
     e: React.DragEvent,
@@ -155,6 +317,7 @@ const Game: React.FC<GameProps> = ({
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, { type: 'column', index: colIndex })}
             onDragEnd={handleDragEnd}
+            onClick={() => handleColumnClick(colIndex)}
             style={{
               minWidth: '84px',
               position: 'relative',
@@ -182,6 +345,10 @@ const Game: React.FC<GameProps> = ({
                 cardIndex >= draggingSource.cardIndex;
 
               const isMovable = isDescendingSequence(column.slice(cardIndex));
+              const isSelected =
+                selectedSource?.type === 'column' &&
+                selectedSource.index === colIndex &&
+                selectedSource.cardIndex === cardIndex;
 
               return (
                 <div
@@ -198,6 +365,15 @@ const Game: React.FC<GameProps> = ({
                     card={card}
                     draggable={card.faceUp}
                     isMovable={isMovable}
+                    isSelected={isSelected}
+                    onClick={(e) => {
+                      e?.stopPropagation();
+                      handleCardClick(card, {
+                        type: 'column',
+                        index: colIndex,
+                        cardIndex,
+                      });
+                    }}
                     onDragStart={(e) =>
                       handleDragStart(e, {
                         type: 'column',
@@ -235,6 +411,7 @@ const Game: React.FC<GameProps> = ({
         {/* Foundations Grid 2x4 */}
         <div
           className="foundations-grid"
+          onClick={() => handleFoundationAreaClick(-1)}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
@@ -247,6 +424,7 @@ const Game: React.FC<GameProps> = ({
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, { type: 'foundation', index })}
               onDragEnd={handleDragEnd}
+              onClick={() => handleFoundationAreaClick(index)}
               style={{
                 border: '2px solid #ccc',
                 borderRadius: '6px',
@@ -262,6 +440,17 @@ const Game: React.FC<GameProps> = ({
                 <CardComponent
                   card={foundation[foundation.length - 1]}
                   draggable={true}
+                  isSelected={
+                    selectedSource?.type === 'foundation' &&
+                    selectedSource.index === index
+                  }
+                  onClick={(e) => {
+                    e?.stopPropagation();
+                    handleCardClick(foundation[foundation.length - 1], {
+                      type: 'foundation',
+                      index,
+                    });
+                  }}
                   onDragStart={(e) =>
                     handleDragStart(e, { type: 'foundation', index })
                   }

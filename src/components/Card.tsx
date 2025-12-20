@@ -3,13 +3,14 @@ import { type Card as CardType } from '../types';
 
 interface CardProps {
   card: CardType;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent) => void;
   onDoubleClick?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDrag?: (e: React.DragEvent) => void;
   style?: React.CSSProperties;
   draggable?: boolean;
   isMovable?: boolean;
+  isSelected?: boolean;
 }
 
 const Card: React.FC<CardProps> = ({
@@ -21,6 +22,7 @@ const Card: React.FC<CardProps> = ({
   style,
   draggable,
   isMovable = true,
+  isSelected = false,
 }) => {
   const getSuitSymbol = (suit: string) => {
     switch (suit) {
@@ -53,7 +55,7 @@ const Card: React.FC<CardProps> = ({
         color: isRed ? 'red' : 'black',
         filter: shouldGrayOut ? 'brightness(0.85) grayscale(0.2)' : 'none',
         backgroundColor: 'white',
-        border: '1px solid #999',
+        border: isSelected ? '3px solid #22c55e' : '1px solid #999',
         borderRadius: '6px',
         width: '84px',
         height: '120px',
@@ -64,6 +66,8 @@ const Card: React.FC<CardProps> = ({
         cursor: draggable && card.faceUp ? 'grab' : 'default',
         userSelect: 'none',
         position: 'relative', // For absolute positioning of corner symbol
+        marginLeft: isSelected ? '-2px' : '0',
+        marginTop: isSelected ? '-2px' : '0',
       }}
     >
       {card.faceUp ? (
