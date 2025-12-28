@@ -2,13 +2,30 @@ import { useState } from 'react';
 import './App.css';
 import Menu from './components/Menu';
 import Game from './components/Game';
+import { type GameSettings } from './types';
 
 function App() {
   const [view, setView] = useState<'menu' | 'game'>('menu');
   const [gameId, setGameId] = useState(0); // Used to force re-render for restart
   const [gameMode, setGameMode] = useState<'new' | 'continue'>('new');
+  const [gameSettings, setGameSettings] = useState<GameSettings>(() => {
+    const savedSettings = localStorage.getItem('spider_egypt_settings');
+    const defaults = {
+      revealAllCards: false,
+      allowAnyCardToEmptyColumn: false,
+    };
+    if (savedSettings) {
+      return { ...defaults, ...JSON.parse(savedSettings) };
+    }
+    return defaults;
+  });
 
   const hasSavedGame = !!localStorage.getItem('spider_egypt_state');
+
+  const handleSettingsChange = (newSettings: GameSettings) => {
+    setGameSettings(newSettings);
+    localStorage.setItem('spider_egypt_settings', JSON.stringify(newSettings));
+  };
 
   const handleStartGame = () => {
     setGameMode('new');
@@ -38,6 +55,8 @@ function App() {
           onStartGame={handleStartGame}
           onContinueGame={handleContinueGame}
           hasSavedGame={hasSavedGame}
+          settings={gameSettings}
+          onSettingsChange={handleSettingsChange}
         />
       ) : (
         <Game
@@ -45,6 +64,7 @@ function App() {
           onRestart={handleRestart}
           onExit={handleExit}
           initialMode={gameMode}
+          settings={gameSettings}
         />
       )}
     </div>

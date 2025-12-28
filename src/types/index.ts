@@ -32,6 +32,11 @@ export interface GameState {
   moves: number;
 }
 
+export interface GameSettings {
+  revealAllCards: boolean;
+  allowAnyCardToEmptyColumn: boolean;
+}
+
 export const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 export const RANKS: Rank[] = [
   'A',

@@ -1,17 +1,33 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { type Card, type GameState, COLUMN_CONFIG } from '../types';
+import {
+  type Card,
+  type GameState,
+  type GameSettings,
+  COLUMN_CONFIG,
+} from '../types';
 import { generateDeck, shuffleDeck } from '../utils/deck';
 import {
   canMoveToColumn,
   canMoveToFoundation,
   isColumnComplete,
+  isDescendingSequence,
 } from '../utils/gameLogic';
 
-export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
+export const useSolitaire = (
+  initialMode: 'new' | 'continue' = 'new',
+  settings: GameSettings = {
+    revealAllCards: false,
+    allowAnyCardToEmptyColumn: false,
+  }
+) => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [history, setHistory] = useState<GameState[]>([]);
   const [isDealing, setIsDealing] = useState(false);
+  const [isAutoCompleting, setIsAutoCompleting] = useState(false);
   const dealingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const pushHistory = useCallback((state: GameState) => {
     setHistory((prev) => {
@@ -36,8 +52,13 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
       clearTimeout(dealingTimeoutRef.current);
       dealingTimeoutRef.current = null;
     }
+    if (autoCompleteTimeoutRef.current) {
+      clearTimeout(autoCompleteTimeoutRef.current);
+      autoCompleteTimeoutRef.current = null;
+    }
 
     setIsDealing(true);
+    setIsAutoCompleting(false);
     setHistory([]); // Clear history on restart
     localStorage.removeItem('spider_egypt_state');
     localStorage.removeItem('spider_egypt_history');
@@ -95,7 +116,7 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
 
       const target = dealTargets[currentDealIndex];
       const card = { ...deck[deckIndex] };
-      if (target.isFaceUp) {
+      if (target.isFaceUp || settings.revealAllCards) {
         card.faceUp = true;
       }
 
@@ -113,7 +134,7 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
 
     // Start dealing
     dealNextCard();
-  }, []);
+  }, [settings]);
 
   // Load state from local storage on mount
   useEffect(() => {
@@ -143,6 +164,9 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
       if (dealingTimeoutRef.current) {
         clearTimeout(dealingTimeoutRef.current);
       }
+      if (autoCompleteTimeoutRef.current) {
+        clearTimeout(autoCompleteTimeoutRef.current);
+      }
     };
   }, [initializeGame, initialMode]);
 
@@ -153,6 +177,87 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
       localStorage.setItem('spider_egypt_history', JSON.stringify(history));
     }
   }, [gameState, history, isDealing]);
+
+  // Auto-complete logic
+  useEffect(() => {
+    if (!gameState || isDealing || isAutoCompleting) return;
+
+    // Check if stock is empty
+    if (gameState.stock.length > 0) return;
+
+    // Check if all columns are either empty or a valid series starting with K
+    const allColumnsReady = gameState.columns.every((col) => {
+      if (col.length === 0) return true;
+      // Must start with K, have no hidden cards, and be a valid sequence
+      return (
+        col[0].rank === 'K' &&
+        col.every((c) => c.faceUp) &&
+        isDescendingSequence(col)
+      );
+    });
+
+    if (allColumnsReady) {
+      // Check if there are any cards left to move (foundations not full)
+      const totalCardsInFoundations = gameState.foundations.reduce(
+        (acc, f) => acc + f.length,
+        0
+      );
+      if (totalCardsInFoundations === 104) return; // 2 decks * 52 cards = 104
+
+      setIsAutoCompleting(true);
+
+      const performAutoMove = () => {
+        setGameState((prevState) => {
+          if (!prevState) return null;
+
+          // Find the first card that can move to a foundation
+          // Prioritize by rank (lowest first) is naturally handled if we just check top cards
+          // because we can only move A, then 2, etc.
+          // We iterate columns to find a move.
+
+          let sourceColIndex = -1;
+          let targetFoundationIndex = -1;
+
+          for (let c = 0; c < prevState.columns.length; c++) {
+            const col = prevState.columns[c];
+            if (col.length === 0) continue;
+
+            const card = col[col.length - 1];
+            for (let f = 0; f < prevState.foundations.length; f++) {
+              if (canMoveToFoundation(card, prevState.foundations[f])) {
+                sourceColIndex = c;
+                targetFoundationIndex = f;
+                break;
+              }
+            }
+            if (sourceColIndex !== -1) break;
+          }
+
+          if (sourceColIndex !== -1) {
+            const newState = { ...prevState };
+            newState.columns = newState.columns.map((col) => [...col]);
+            newState.foundations = newState.foundations.map((found) => [
+              ...found,
+            ]);
+
+            const card = newState.columns[sourceColIndex].pop()!;
+            newState.foundations[targetFoundationIndex].push(card);
+            newState.moves += 1;
+
+            // Schedule next move
+            autoCompleteTimeoutRef.current = setTimeout(performAutoMove, 100);
+            return newState;
+          } else {
+            // No more moves found? Should not happen if condition met, unless done.
+            setIsAutoCompleting(false);
+            return prevState;
+          }
+        });
+      };
+
+      autoCompleteTimeoutRef.current = setTimeout(performAutoMove, 100);
+    }
+  }, [gameState, isDealing, isAutoCompleting]);
 
   const moveCard = useCallback(
     (
@@ -188,7 +293,13 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
       // Validate and Move to Target
       if (target.type === 'column') {
         const targetCol = newState.columns[target.index];
-        if (canMoveToColumn(cardsToMove, targetCol)) {
+        if (
+          canMoveToColumn(
+            cardsToMove,
+            targetCol,
+            settings.allowAnyCardToEmptyColumn
+          )
+        ) {
           // Remove from source
           if (source.type === 'column') {
             newState.columns[source.index].splice(
@@ -339,6 +450,10 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
     [gameState, pushHistory]
   );
 
+  const isWon = gameState
+    ? gameState.foundations.reduce((acc, f) => acc + f.length, 0) === 104
+    : false;
+
   return {
     gameState,
     initializeGame,
@@ -348,5 +463,6 @@ export const useSolitaire = (initialMode: 'new' | 'continue' = 'new') => {
     isDealing,
     undo,
     canUndo: history.length > 0 && !isDealing,
+    isWon,
   };
 };

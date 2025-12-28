@@ -1,19 +1,25 @@
 import React from 'react';
 import { useSolitaire } from '../hooks/useSolitaire';
 import CardComponent from './Card';
-import { type Card as CardType } from '../types';
-import { isDescendingSequence, canMoveToColumn } from '../utils/gameLogic';
+import { type Card as CardType, type GameSettings } from '../types';
+import {
+  isDescendingSequence,
+  canMoveToColumn,
+  canMoveToFoundation,
+} from '../utils/gameLogic';
 
 interface GameProps {
   onRestart: () => void;
   onExit: () => void;
   initialMode?: 'new' | 'continue';
+  settings?: GameSettings;
 }
 
 const Game: React.FC<GameProps> = ({
   onRestart,
   onExit,
   initialMode = 'new',
+  settings = { revealAllCards: false, allowAnyCardToEmptyColumn: false },
 }) => {
   const {
     gameState,
@@ -24,7 +30,8 @@ const Game: React.FC<GameProps> = ({
     isDealing,
     undo,
     canUndo,
-  } = useSolitaire(initialMode);
+    isWon,
+  } = useSolitaire(initialMode, settings);
   const [draggingSource, setDraggingSource] = React.useState<{
     type: 'column' | 'foundation';
     index: number;
@@ -96,7 +103,13 @@ const Game: React.FC<GameProps> = ({
       }
 
       const targetCol = gameState.columns[source.index];
-      if (canMoveToColumn(cardsToMove, targetCol)) {
+      if (
+        canMoveToColumn(
+          cardsToMove,
+          targetCol,
+          settings.allowAnyCardToEmptyColumn
+        )
+      ) {
         moveCard(selectedSource, { type: 'column', index: source.index });
         setSelectedSource(null);
       } else {
@@ -170,7 +183,13 @@ const Game: React.FC<GameProps> = ({
       }
 
       const targetCol = gameState.columns[colIndex]; // Should be empty
-      if (canMoveToColumn(cardsToMove, targetCol)) {
+      if (
+        canMoveToColumn(
+          cardsToMove,
+          targetCol,
+          settings.allowAnyCardToEmptyColumn
+        )
+      ) {
         moveCard(selectedSource, { type: 'column', index: colIndex });
         setSelectedSource(null);
       } else {
@@ -266,12 +285,51 @@ const Game: React.FC<GameProps> = ({
 
   const handleDrop = (
     e: React.DragEvent,
-    target: { type: 'column' | 'foundation'; index: number }
+    target: { type: 'column' | 'foundation'; index: number } | 'foundation-area'
   ) => {
     e.preventDefault();
+    e.stopPropagation();
     const data = e.dataTransfer.getData('text/plain');
     try {
       const source = JSON.parse(data);
+
+      // Helper to get card being dragged
+      let card: CardType | null = null;
+      if (source.type === 'column' && source.cardIndex !== undefined) {
+        const col = gameState.columns[source.index];
+        // Only allow auto-move if it's the last card in the column
+        if (source.cardIndex === col.length - 1) {
+          card = col[source.cardIndex];
+        }
+      } else if (source.type === 'foundation') {
+        const f = gameState.foundations[source.index];
+        if (f.length > 0) card = f[f.length - 1];
+      }
+
+      if (target === 'foundation-area') {
+        if (card && source.type === 'column') {
+          autoMoveToFoundation(card, source);
+        }
+        setDraggingSource(null);
+        return;
+      }
+
+      if (target.type === 'foundation') {
+        if (card) {
+          const targetFoundation = gameState.foundations[target.index];
+          if (canMoveToFoundation(card, targetFoundation)) {
+            moveCard(source, target);
+          } else {
+            // Fallback to auto-move if valid (smart drop)
+            if (source.type === 'column') {
+              autoMoveToFoundation(card, source);
+            }
+          }
+        }
+        setDraggingSource(null);
+        return;
+      }
+
       moveCard(source, target);
     } catch (err) {
       console.error('Invalid drop data', err);
@@ -297,6 +355,7 @@ const Game: React.FC<GameProps> = ({
         padding: '20px',
         gap: '20px',
         boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
       {/* Left: Columns */}
@@ -412,6 +471,8 @@ const Game: React.FC<GameProps> = ({
         <div
           className="foundations-grid"
           onClick={handleFoundationAreaClick}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, 'foundation-area')}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
@@ -588,6 +649,25 @@ const Game: React.FC<GameProps> = ({
                 />
               </div>
             )}
+        </div>
+      )}
+      {isWon && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: '72px',
+            fontWeight: 'bold',
+            color: '#ffd700',
+            textShadow: '2px 2px 4px #000',
+            zIndex: 10000,
+            pointerEvents: 'none',
+            animation: 'fadeIn 1s ease-in',
+          }}
+        >
+          Nyertél!
         </div>
       )}
     </div>

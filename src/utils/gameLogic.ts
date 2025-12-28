@@ -20,7 +20,8 @@ export const isDescendingSequence = (cards: Card[]): boolean => {
 
 export const canMoveToColumn = (
   sourceCards: Card[],
-  targetColumn: Card[]
+  targetColumn: Card[],
+  allowAnyCardToEmptyColumn: boolean = false
 ): boolean => {
   if (sourceCards.length === 0) return false;
 
@@ -29,8 +30,9 @@ export const canMoveToColumn = (
     return false;
   }
 
-  // If target column is empty, only K can be placed
+  // If target column is empty
   if (targetColumn.length === 0) {
+    if (allowAnyCardToEmptyColumn) return true;
     return sourceCards[0].rank === 'K';
   }
 
